@@ -13,9 +13,12 @@ var (
 
 // 程序配置
 type Config struct {
-	ApiPort         int `json:"apiPort"`
-	ApiReadTimeout  int `json:"apiReadTimeout"`
-	ApiWriteTimeout int `json:"apiWriteTimeout"`
+	ApiPort         int      `json:"apiPort"`
+	ApiReadTimeout  int      `json:"apiReadTimeout"`
+	ApiWriteTimeout int      `json:"apiWriteTimeout"`
+	EtcdEndpoints   []string `json:"etcdEndpoints"`
+	EtcdDialTimeout int      `json:"etcdDialTimeout"`
+	Webroot         string   `json:"webroot"`
 }
 
 // 加载配置

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"gocrontab/src/github.com/projectyk/ykcrontab/master"
 	"runtime"
+	"time"
 )
 
 func initEnv() {
@@ -39,11 +40,19 @@ func main() {
 		goto ERR
 	}
 
+	if err = master.InitJobMgr(); err != nil {
+		goto ERR
+	}
+
 	// 启动API HTTP服务
 	if err = master.InitApiServer(); err != nil {
 		goto ERR
 	}
 	// 正常退出
+
+	for {
+		time.Sleep(time.Second)
+	}
 
 	return
 
