@@ -3,6 +3,7 @@ package worker
 import (
 	"fmt"
 	"gocrontab/src/github.com/projectyk/ykcrontab/common"
+	"reflect"
 	"time"
 )
 
@@ -23,8 +24,12 @@ func (scheduler *Scheduler) handleJobEvent(jobEvent *common.JobEvent) {
 
 	var (
 		jobSchedulePlan *common.JobSchedulePlan
-		jobExisted      bool
-		err             error
+
+		jobExecuteInfo *common.JobExecuteInfo
+		jobExecuting   bool
+
+		jobExisted bool
+		err        error
 	)
 
 	switch jobEvent.EventType {
@@ -42,6 +47,20 @@ func (scheduler *Scheduler) handleJobEvent(jobEvent *common.JobEvent) {
 		if jobSchedulePlan, jobExisted = scheduler.jobPlanTable[jobEvent.Job.Name]; jobExisted {
 			// 从计划表删除
 			delete(scheduler.jobPlanTable, jobEvent.Job.Name)
+		}
+	case common.JOB_EVENT_KILL: // 任务强杀事件
+		// 取消command的执行,判断是否在执行中
+		fmt.Println("任务强杀事件")
+		fmt.Println("jobEvent.Job.Name---%p", reflect.TypeOf(jobEvent.Job.Name))
+		fmt.Println("jobEvent.Job.Name---", scheduler.jobExecutingTable["job6"])
+		fmt.Println(scheduler.jobExecutingTable)
+		if jobExecuteInfo, jobExecuting = scheduler.jobExecutingTable[jobEvent.Job.Name]; jobExecuting {
+
+			fmt.Println("我强")
+			jobExecuteInfo.CancelFunc() //触发Command杀死shell子进程,任务得到退出
+			fmt.Println("成功")
+		} else {
+			fmt.Println("不行啊")
 		}
 	}
 }
@@ -66,7 +85,10 @@ func (scheduler *Scheduler) TryStartJob(jobPlan *common.JobSchedulePlan) {
 
 	//构建执行状态信息
 	jobExecuteInfo = common.BuildJobExecuteInfo(jobPlan)
+
 	//保存任务状态
+	scheduler.jobExecutingTable[jobPlan.Job.Name] = jobExecuteInfo
+	fmt.Println("保存任务状态", scheduler.jobExecutingTable)
 
 	fmt.Println("执行任务:", jobExecuteInfo.Job.Name, jobExecuteInfo.RealTime)
 	// 执行任务
@@ -89,7 +111,7 @@ func (scheduler *Scheduler) TrySchedule() (scheduleAfter time.Duration) {
 		return
 	}
 
-	// 当前时间
+	// 当前时间lines)
 	now = time.Now()
 
 	// 1 遍历所有任务
@@ -116,6 +138,8 @@ func (scheduler *Scheduler) TrySchedule() (scheduleAfter time.Duration) {
 // 处理任务结果
 
 func (scheduler *Scheduler) handleJobResult(result *common.JobExecuteResult) {
+	fmt.Println(scheduler.jobExecutingTable)
+	fmt.Println("1wsd", reflect.TypeOf(result.ExecuteInfo.Job.Name))
 	// 删除执行任务
 	delete(scheduler.jobExecutingTable, result.ExecuteInfo.Job.Name)
 	fmt.Println("任务执行完成：", result.ExecuteInfo.Job.Name, string(result.Output), result.Err)
@@ -147,6 +171,7 @@ func (scheduler *Scheduler) scheduleLoop() {
 
 		case jobResult = <-scheduler.jobResultChan: //监听任务执行结果
 			scheduler.handleJobResult(jobResult)
+
 		}
 		// 调度一次任务
 		scheduleAfter = scheduler.TrySchedule()

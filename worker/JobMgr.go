@@ -102,6 +102,44 @@ func (jobMgr *JobMgr) watchJobs() (err error) {
 	return
 }
 
+// 监听强杀任务通知
+func (jobMgr *JobMgr) watchKiller() {
+
+	var (
+		watchChan  clientv3.WatchChan
+		watchResp  clientv3.WatchResponse
+		watchEvent *clientv3.Event
+		jobEvent   *common.JobEvent
+		jobName    string
+		job        *common.Job
+	)
+
+	// 监听/cron/killer/ 目录
+	go func() {
+		watchChan = jobMgr.watcher.Watch(context.TODO(), common.JOB_KILLER_DIR, clientv3.WithPrefix())
+
+		// 处理监听事件
+		for watchResp = range watchChan {
+			for _, watchEvent = range watchResp.Events {
+				switch watchEvent.Type {
+				case mvccpb.PUT: // 杀死任务事件
+					jobName = common.ExtractKillerName(string(watchEvent.Kv.Key))
+					job = &common.Job{
+						Name: jobName,
+					}
+					jobEvent = common.BuildJobEvent(common.JOB_EVENT_KILL, job)
+
+					// 事件推给scheduler
+					fmt.Println("wotui")
+					G_scheduler.PushJobEvent(jobEvent)
+
+				case mvccpb.DELETE: // killer标记过期,自动删除
+				}
+			}
+		}
+	}()
+}
+
 // 初始化管理器
 func InitJobMgr() (err error) {
 	var (
@@ -136,5 +174,16 @@ func InitJobMgr() (err error) {
 
 	// 启动任务监听
 	G_jobMgr.watchJobs()
+
+	// 启动监听killer
+	G_jobMgr.watchKiller()
+
+	return
+}
+
+// 创建任务执行锁
+func (jobMgr *JobMgr) CreateJobLock(jobName string) (jobLock *JobLock) {
+	// 返回一把锁
+	jobLock = InitJobLock(jobName, jobMgr.kv, jobMgr.lease)
 	return
 }

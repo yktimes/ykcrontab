@@ -1,6 +1,7 @@
 package common
 
 import (
+	"context"
 	"encoding/json"
 	"gocrontab/src/github.com/gorhill/cronexpr"
 	"strings"
@@ -111,6 +112,9 @@ type JobExecuteInfo struct {
 	Job      *Job      // 任务信息
 	PlanTime time.Time // 理论上的调度时间
 	RealTime time.Time // 实际调度事件
+
+	CancelCtx  context.Context    // 任务Command 的context
+	CancelFunc context.CancelFunc //  用于取消command执行的cancel函数
 }
 
 // 构造执行状态信息
@@ -121,6 +125,8 @@ func BuildJobExecuteInfo(jobSchedulePlan *JobSchedulePlan) (jobExecuteInfo *JobE
 		PlanTime: jobSchedulePlan.NextTime,
 		RealTime: time.Now(),
 	}
+
+	jobExecuteInfo.CancelCtx, jobExecuteInfo.CancelFunc = context.WithCancel(context.TODO())
 	return
 }
 
@@ -131,4 +137,11 @@ type JobExecuteResult struct {
 	Err         error           // 脚本错误原因
 	StartTime   time.Time       // 启动时间
 	EndTime     time.Time       // 结束时间
+}
+
+// 从etcd的key提取任务名
+// /cron/killer/job10 去掉/cron/jobs/
+func ExtractKillerName(killerKey string) string {
+
+	return strings.TrimPrefix(killerKey, JOB_KILLER_DIR)
 }
